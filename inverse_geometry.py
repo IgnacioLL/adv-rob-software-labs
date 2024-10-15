@@ -15,12 +15,42 @@ from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 
 from tools import setcubeplacement
 
+from scipy.optimize import fmin_bfgs,fmin_slsqp
+from numpy.linalg import norm,inv,pinv,svd,eig
+import time
+
+def cost_v1(q, target_left, target_right, lh_frameid,rh_frameid):
+    #eff = endeffector(q)
+    pin.framesForwardKinematics(robot.model,robot.data,q)
+    
+    eff_lh = robot.data.oMf[lh_frameid]
+    eff_rh = robot.data.oMf[rh_frameid]
+    
+    cost_lh = np.linalg.norm(eff_lh.np - target_left.np)**2
+    cost_rh = np.linalg.norm(eff_rh.np - target_right.np)**2
+    
+    return cost_lh + cost_rh
+
+def callback(q):
+    pass
+    #updatevisuals(viz, robot, cube, q)
+    #time.sleep(.5)
+
 def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
     '''Return a collision free configuration grasping a cube at a specific location and a success flag'''
     setcubeplacement(robot, cube, cubetarget)
-    #TODO implement
-    print ("TODO: implement me")
-    return robot.q0, False
+
+    target_left = getcubeplacement(cube, LEFT_HOOK)
+    target_right = getcubeplacement(cube, RIGHT_HOOK)
+    lh_frameid = robot.model.getFrameId('LARM_EFF')
+    rh_frameid = robot.model.getFrameId('RARM_EFF')
+
+    try:
+        qopt_bfgs = fmin_bfgs(cost_v1, qcurrent, args=(target_left, target_right, lh_frameid,rh_frameid))
+
+        return qopt_bfgs, True
+    except:
+        return qcurrent, False
             
 if __name__ == "__main__":
     from tools import setupwithmeshcat
