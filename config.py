@@ -14,7 +14,7 @@ from pinocchio.utils import rotate
 #These parameters can be edited
 USE_MESHCAT = True # part 1 uses meshcat
 USE_PYBULLET = True # the second part of the lab will use pybullet
-MESHCAT_URL ="tcp://127.0.0.1:6002"
+MESHCAT_URL ="tcp://127.0.0.1:6000"
 USE_PYBULLET_GUI = USE_PYBULLET and True
 USE_PYBULLET_REALTIME = USE_PYBULLET and False
 

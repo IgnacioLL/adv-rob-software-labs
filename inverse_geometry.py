@@ -51,7 +51,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001):
         callback=callback, 
         args=(robot, target_left, target_right, lh_frameid,rh_frameid),
         full_output=True,
-        #disp=False
+        disp=False
     )
 
     distance = distanceToObstacle(robot, qopt_bfgs[0])
