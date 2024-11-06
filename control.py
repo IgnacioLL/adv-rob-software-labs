@@ -44,17 +44,19 @@ if __name__ == "__main__":
     #TODO this is just an example, you are free to do as you please.
     #In any case this trajectory does not follow the path 
     #0 init and end velocities
-    def maketraj(q0,q1,T): #TODO compute a real trajectory !
-        q_of_t = Bezier([q0,q0,q1,q1],t_max=T)
+    def maketraj(path_points,T): #TODO compute a real trajectory !
+        q_of_t = Bezier(path_points,t_max=T)
         vq_of_t = q_of_t.derivative(1)
         vvq_of_t = vq_of_t.derivative(1)
         return q_of_t, vq_of_t, vvq_of_t
     
     
     #TODO this is just a random trajectory, you need to do this yourself
-    total_time=4.
-    trajs = maketraj(q0, qe, total_time)   
-    
+    path.insert(0, q0)
+    path.append(qe)
+    total_time=10
+    trajs = maketraj(path, total_time)  
+
     tcur = 0.
     
     
