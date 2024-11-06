@@ -49,13 +49,8 @@ if __name__ == "__main__":
     
     q0,successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
     qe,successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET,  None)
-    # path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
+    path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
 
-    import pickle as pkl
-    # pkl.dump(path, open("path.pkl", "wb"))
-    path = pkl.load(open("path.pkl", "rb"))
-
-    
     #setting initial configuration
     sim.setqsim(q0)
     
