@@ -7,18 +7,33 @@ Created on Wed Sep  6 15:32:51 2023
 """
 
 import numpy as np
-
+import time
 from bezier import Bezier
     
 # in my solution these gains were good enough for all joints but you might want to tune this.
-Kp = 300.               # proportional gain (P of PD)
+Kp = 100.               # proportional gain (P of PD)
 Kv = 2 * np.sqrt(Kp)   # derivative gain (D of PD)
 
 def controllaw(sim, robot, trajs, tcurrent, cube):
     q, vq = sim.getpybulletstate()
     #TODO 
-    torques = [0.0 for _ in sim.bulletCtrlJointsInPinOrder]
+
+    q_target = trajs[0](tcurrent)
+    v_target = trajs[1](tcurrent)
+
+    previous_error_q = np.zeros(q_target.shape)
+
+    errors = (q_target - q)
+
+    torques = []
+    for error, error_old in zip(errors, previous_error_q):
+        e_d = (error - error_old)/DT
+        u = Kp*error + Kv*e_d
+        torques.append(u)
+
     sim.step(torques)
+
+    previous_error_q = errors.copy()
 
 if __name__ == "__main__":
         
@@ -34,7 +49,11 @@ if __name__ == "__main__":
     
     q0,successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
     qe,successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET,  None)
-    path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
+    # path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
+
+    import pickle as pkl
+    # pkl.dump(path, open("path.pkl", "wb"))
+    path = pkl.load(open("path.pkl", "rb"))
 
     
     #setting initial configuration
@@ -54,7 +73,7 @@ if __name__ == "__main__":
     #TODO this is just a random trajectory, you need to do this yourself
     path.insert(0, q0)
     path.append(qe)
-    total_time=10
+    total_time=4
     trajs = maketraj(path, total_time)  
 
     tcur = 0.
