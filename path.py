@@ -81,7 +81,7 @@ class Node_Graph:
                 
         return nearest_node_id
 
-def is_edge_valid(q, cube_root, cube_leaf, n_steps) -> bool:
+def is_edge_valid(robot, cube, q, cube_root, cube_leaf, n_steps) -> bool:
 
     quat_root = pin.Quaternion(cube_root.rotation)
     quat_leaf = pin.Quaternion(cube_leaf.rotation)
@@ -110,7 +110,7 @@ def is_edge_valid(q, cube_root, cube_leaf, n_steps) -> bool:
         
     return True
 
-def create_path(N, q0, c0, qe, ce, n_steps_interpol=20):
+def create_path(robot, cube, N, q0, c0, qe, ce, n_steps_interpol=20):
     #setcubeplacement(robot, cube, c0)
     #updatevisuals(viz, robot, cube, q=q0)
     
@@ -130,7 +130,7 @@ def create_path(N, q0, c0, qe, ce, n_steps_interpol=20):
             closest_node_id = g.find_closest_neigbour(sampled_cube)
             closest_node = g.nodes[closest_node_id]
 
-            valid_edge = is_edge_valid(closest_node.q, closest_node.cube, sampled_cube, n_steps=n_steps_interpol)
+            valid_edge = is_edge_valid(robot, cube, closest_node.q, closest_node.cube, sampled_cube, n_steps=n_steps_interpol)
             
             if valid_edge:
                 #print('Valid Path')
@@ -139,7 +139,7 @@ def create_path(N, q0, c0, qe, ce, n_steps_interpol=20):
                 new_node_id = g.add_node(new_node)
                 g.add_edge(closest_node_id, new_node_id)
                 
-                valid_finish = is_edge_valid(qt, sampled_cube, ce, n_steps=n_steps_interpol)
+                valid_finish = is_edge_valid(robot, cube, qt, sampled_cube, ce, n_steps=n_steps_interpol)
                 if valid_finish:
                     g.add_edge(new_node_id, end_node_id)
                     available_path = True
@@ -185,8 +185,10 @@ def shortest_path(g):
 
 #returns a collision free path from qinit to qgoal under grasping constraints
 #the path is expressed as a list of configurations
-def computepath(qinit,qgoal,cubeplacementq0, cubeplacementqgoal):
+def computepath(robot, cube, qinit,qgoal,cubeplacementq0, cubeplacementqgoal):
     graph, success = create_path(
+        robot,
+        cube, 
         N=500,
         q0=qinit,
         c0=cubeplacementq0,
