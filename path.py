@@ -17,6 +17,7 @@ import heapq
 from tools import setupwithmeshcat
 from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 from inverse_geometry import computeqgrasppose
+from tqdm import tqdm
 
 def generate_random_cube():
     
@@ -121,7 +122,8 @@ def create_path(robot, cube, N, q0, c0, qe, ce, n_steps_interpol=20):
 
     prev_q = q0.copy()
     available_path = False
-    for _ in range(N):
+    print("Creating sample path: ")
+    for _ in tqdm(range(N), ascii=True, unit='samples'):
         # maybe make a better randomizer how this is done 
         sampled_cube = generate_random_cube()
         
