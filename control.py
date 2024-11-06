@@ -9,31 +9,54 @@ Created on Wed Sep  6 15:32:51 2023
 import numpy as np
 import time
 from bezier import Bezier
+from tools import setcubeplacement
+from config import CUBE_PLACEMENT_TARGET
     
 # in my solution these gains were good enough for all joints but you might want to tune this.
-Kp = 100.               # proportional gain (P of PD)
-Kv = 2 * np.sqrt(Kp)   # derivative gain (D of PD)
+Kp = 15_000. # proportional gain (P of PD)
+Kv = 3_000   # derivative gain (D of PD)
+
+v_Kp = 0
+v_Kv = 0
+
+
+q_previous_error = None
+v_previous_error = None
 
 def controllaw(sim, robot, trajs, tcurrent, cube):
+
+    global q_previous_error, v_previous_error
+    
     q, vq = sim.getpybulletstate()
-    #TODO 
 
     q_target = trajs[0](tcurrent)
     v_target = trajs[1](tcurrent)
+    
+    # Initialize previous errors to 0.
+    if q_previous_error is None and v_previous_error is None:
+        q_previous_error = np.zeros(q_target.shape)
+        v_previous_error = np.zeros(v_target.shape)
 
-    previous_error_q = np.zeros(q_target.shape)
-
-    errors = (q_target - q)
+    q_errors = (q_target - q)
+    q_errors_d = (q_errors - q_previous_error)
+    
+    v_errors = (v_target - vq)
+    v_errors_d = (v_errors - v_previous_error)
 
     torques = []
-    for error, error_old in zip(errors, previous_error_q):
-        e_d = (error - error_old)/DT
-        u = Kp*error + Kv*e_d
+    for q_error, e_d, v_error, v_error_d in zip(q_errors, q_errors_d, v_errors, v_errors_d):
+
+        u = Kp*q_error + Kv*e_d + v_Kp*v_error + v_Kv*v_error_d
         torques.append(u)
 
     sim.step(torques)
 
-    previous_error_q = errors.copy()
+    v_previous_error = v_errors.copy()
+    q_previous_error = q_errors.copy()
+
+    
+
+ 
 
 if __name__ == "__main__":
         
@@ -49,7 +72,10 @@ if __name__ == "__main__":
     
     q0,successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
     qe,successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET,  None)
-    path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
+    # path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
+
+    import pickle as pkl
+    path = pkl.load(open("path.pkl", "rb"))
 
     #setting initial configuration
     sim.setqsim(q0)
@@ -68,7 +94,7 @@ if __name__ == "__main__":
     #TODO this is just a random trajectory, you need to do this yourself
     path.insert(0, q0)
     path.append(qe)
-    total_time=4
+    total_time=10
     trajs = maketraj(path, total_time)  
 
     tcur = 0.
