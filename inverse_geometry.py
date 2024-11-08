@@ -19,7 +19,7 @@ from scipy.optimize import fmin_bfgs,fmin_slsqp
 from numpy.linalg import norm,inv,pinv,svd,eig
 import time
 
-def cost_v1(q, robot, target_left, target_right, lh_frameid,rh_frameid):
+def cost_v1(q, robot, target_left, target_right, lh_frameid, rh_frameid):
     #eff = endeffector(q)
     pin.framesForwardKinematics(robot.model,robot.data,q)
     
@@ -53,8 +53,6 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001):
         full_output=True,
         disp=False
     )
-
-    distance = distanceToObstacle(robot, qopt_bfgs[0])
 
     tolerable_error = False
     if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]):

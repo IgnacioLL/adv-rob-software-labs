@@ -9,3 +9,4 @@ scipy
 tensorflow
 ndcurves
 pybullet
+numpy==1.26.3

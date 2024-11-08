@@ -37,7 +37,6 @@ def generate_random_cube():
 
 def euclid_dist(cube_1, cube_2) -> float:
     return np.sqrt(np.sum((cube_2.translation - cube_1.translation)**2))
-
 class Node:
     def __init__(self, cube_coordinates, q):
         self.cube = cube_coordinates
@@ -81,8 +80,9 @@ class Node_Graph:
                 nearest_node_id = i
                 
         return nearest_node_id
-
-def is_edge_valid(robot, cube, q, cube_root, cube_leaf, n_steps) -> bool:
+    
+    
+def compute_interpolation(robot, cube, q, cube_root, cube_leaf, n_steps) -> bool:
 
     quat_root = pin.Quaternion(cube_root.rotation)
     quat_leaf = pin.Quaternion(cube_leaf.rotation)
@@ -91,25 +91,43 @@ def is_edge_valid(robot, cube, q, cube_root, cube_leaf, n_steps) -> bool:
     delta_translation = total_translation / n_steps
 
     cube_interim = cube_root.copy()
-    q_interim = q.copy()
-    for i in range(n_steps):
+    qs_interpolated = [(cube_interim, q.copy())]
+
+    for i in range(n_steps+1):
         quat_delta = quat_root.slerp(i/n_steps, quat_leaf)
         cube_interim.rotation = quat_delta.matrix()
         
         cube_interim.translation += delta_translation
         
-        qt, success = computeqgrasppose(robot, q_interim, cube, cube_interim, viz=None)
+        qt, success = computeqgrasppose(robot, qs_interpolated[-1], cube, cube_interim, viz=None)
         
         #setcubeplacement(robot, cube, cube_interim)
         #updatevisuals(viz, robot, cube, q=qt)
  
         if success:
-            q_interim = qt
-            pass
+            qs_interpolated.append((cube_interim, qt))
         else:
-            return False
-        
-    return True
+            break        
+
+        return qs_interpolated
+
+def add_interpolations(g, qs_interpolated, closest_node_id, n_interpolations=1):
+
+    if not n_interpolations <= len(qs_interpolated) - 1:
+        n_interpolations = len(qs_interpolated) - 1
+
+    prev_node_id = closest_node_id
+    for i in range(1, n_interpolations+1):
+        idx_inter = (i * (len(qs_interpolated) // n_interpolations)) - 1
+
+        new_node = Node(qs_interpolated[idx_inter][0], qs_interpolated[idx_inter][1])
+
+        new_node_id = g.add_node(new_node)
+        g.add_edge(prev_node_id, new_node_id)
+
+        prev_node_id = new_node_id
+
+    return prev_node_id 
 
 def create_path(robot, cube, N, q0, c0, qe, ce, n_steps_interpol=20):
     #setcubeplacement(robot, cube, c0)
@@ -132,19 +150,18 @@ def create_path(robot, cube, N, q0, c0, qe, ce, n_steps_interpol=20):
             closest_node_id = g.find_closest_neigbour(sampled_cube)
             closest_node = g.nodes[closest_node_id]
 
-            valid_edge = is_edge_valid(robot, cube, closest_node.q, closest_node.cube, sampled_cube, n_steps=n_steps_interpol)
-            
-            if valid_edge:
-                #print('Valid Path')
-                new_node = Node(sampled_cube, qt)
-                
-                new_node_id = g.add_node(new_node)
-                g.add_edge(closest_node_id, new_node_id)
-                
-                valid_finish = is_edge_valid(robot, cube, qt, sampled_cube, ce, n_steps=n_steps_interpol)
-                if valid_finish:
-                    g.add_edge(new_node_id, end_node_id)
-                    available_path = True
+            qs_interpolated = compute_interpolation(robot, cube, closest_node.q, closest_node.cube, sampled_cube, n_steps=n_steps_interpol)
+
+            if len(qs_interpolated) > 1:
+                last_node_id = add_interpolations(g, qs_interpolated, closest_node_id, n_interpolations=2)
+
+                qs_interpolated_end = compute_interpolation(robot, cube, qs_interpolated[-1][1], qs_interpolated[-1][0], ce, n_steps=n_steps_interpol)
+                if len(qs_interpolated_end) > 1:
+
+                    g = add_interpolations(g, qs_interpolated_end, last_node_id, n_interpolations=2)
+
+                    if len(qs_interpolated_end) == n_steps_interpol+1:
+                        available_path = True
         
     return g, available_path
 

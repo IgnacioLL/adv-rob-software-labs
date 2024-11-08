@@ -13,8 +13,8 @@ from tools import setcubeplacement
 from config import CUBE_PLACEMENT_TARGET
     
 # in my solution these gains were good enough for all joints but you might want to tune this.
-Kp = 15_000. # proportional gain (P of PD)
-Kv = 3_000   # derivative gain (D of PD)
+Kp = 15000. # proportional gain (P of PD)
+Kv = 1000   # derivative gain (D of PD)
 
 v_Kp = 0
 v_Kv = 0
@@ -73,10 +73,8 @@ if __name__ == "__main__":
     q0,successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
     qe,successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET,  None)
     # path = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
-
     import pickle as pkl
-    path = pkl.load(open("path.pkl", "rb"))
-
+    path = pkl.load(open('path.pkl', 'rb'))
     #setting initial configuration
     sim.setqsim(q0)
     
@@ -91,11 +89,13 @@ if __name__ == "__main__":
         return q_of_t, vq_of_t, vvq_of_t
     
     
-    #TODO this is just a random trajectory, you need to do this yourself
-    path.insert(0, q0)
-    path.append(qe)
-    total_time=10
-    trajs = maketraj(path, total_time)  
+    new_path = []
+    for p in path:
+        for _ in range(5):
+            new_path.append(p)
+
+    total_time=4
+    trajs = maketraj(new_path, total_time)  
 
     tcur = 0.
     
