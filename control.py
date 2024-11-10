@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     sim.setqsim(q0)
 
-    extra_args = {'n_samples': 200, 'n_steps_graph_interpolations':5}
+    extra_args = {'n_samples': 250, 'n_steps_graph_interpolations':5}
     path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
     
     # Create redundancy in BEZIER

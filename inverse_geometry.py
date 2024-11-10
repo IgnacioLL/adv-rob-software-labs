@@ -60,7 +60,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001, c
     if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]):
         tolerable_error = True
         if control:
-            grip_adjustment = (target_right.translation - target_left.translation)/3
+            grip_adjustment = (target_right.translation - target_left.translation)/4
             target_right.translation = target_right.translation - grip_adjustment
             target_left.translation = target_left.translation + grip_adjustment
 
