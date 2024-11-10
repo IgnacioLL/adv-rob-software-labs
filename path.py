@@ -3,7 +3,7 @@
 """
 Created on Thu Sep 21 11:44:32 2023
 
-@author: stonneau
+@author: Ignacio Lloret and Hypolite 
 """
 
 import pinocchio as pin
@@ -18,6 +18,8 @@ from tools import setupwithmeshcat
 from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 from inverse_geometry import computeqgrasppose
 from tqdm import tqdm
+import math
+
 
 def generate_random_cube():
     
@@ -37,6 +39,8 @@ def generate_random_cube():
 
 def euclid_dist(cube_1, cube_2) -> float:
     return np.sqrt(np.sum((cube_2.translation - cube_1.translation)**2))
+
+
 class Node:
     def __init__(self, cube_coordinates, q):
         self.cube = cube_coordinates
@@ -80,59 +84,79 @@ class Node_Graph:
                 nearest_node_id = i
                 
         return nearest_node_id
+
+
+def create_spaced_index(length, k):
+    length = length - 1
     
+    step_size = length / k
     
-def compute_interpolation(robot, cube, q, cube_root, cube_leaf, n_steps) -> bool:
+    cumulate = 0
+    indexes = []
+    for i in range(k):
+        cumulate += step_size
+        if math.ceil(cumulate) < length:
+            indexes.append(math.ceil(cumulate))
+    
+    indexes.append(length)
+    indexes = list(set(indexes))
+    indexes.sort()
+    return indexes
+        
+
+def compute_interpolation(robot, cube, q, cube_root, cube_leaf, n_steps, control) -> bool:
 
     quat_root = pin.Quaternion(cube_root.rotation)
     quat_leaf = pin.Quaternion(cube_leaf.rotation)
 
     total_translation = cube_leaf.translation - cube_root.translation
     delta_translation = total_translation / n_steps
-
+    
     cube_interim = cube_root.copy()
-    qs_interpolated = [(cube_interim, q.copy())]
-
-    for i in range(n_steps+1):
+    q_interim = q.copy()
+    
+    qs_interpolated = [(cube_interim.copy(), q_interim.copy())]
+    for i in range(1, n_steps+1):
         quat_delta = quat_root.slerp(i/n_steps, quat_leaf)
         cube_interim.rotation = quat_delta.matrix()
-        
         cube_interim.translation += delta_translation
         
-        qt, success = computeqgrasppose(robot, qs_interpolated[-1], cube, cube_interim, viz=None)
-        
-        #setcubeplacement(robot, cube, cube_interim)
-        #updatevisuals(viz, robot, cube, q=qt)
+        qt, success = computeqgrasppose(robot, q_interim, cube, cube_interim, viz=None, control=control)
  
         if success:
-            qs_interpolated.append((cube_interim, qt))
+            qs_interpolated.append((cube_interim.copy(), qt.copy()))
+            q_interim = qt
         else:
-            break        
+            return np.array([]), False
 
-        return qs_interpolated
+    return qs_interpolated, True
 
-def add_interpolations(g, qs_interpolated, closest_node_id, n_interpolations=1):
-
+def add_interpolations(g, qs_interpolated, closest_node_id, n_interpolations=1, end_node_id=None):
+    
     if not n_interpolations <= len(qs_interpolated) - 1:
         n_interpolations = len(qs_interpolated) - 1
 
     prev_node_id = closest_node_id
-    for i in range(1, n_interpolations+1):
-        idx_inter = (i * (len(qs_interpolated) // n_interpolations)) - 1
-
-        new_node = Node(qs_interpolated[idx_inter][0], qs_interpolated[idx_inter][1])
-
-        new_node_id = g.add_node(new_node)
-        g.add_edge(prev_node_id, new_node_id)
-
-        prev_node_id = new_node_id
+    
+    idx_list = create_spaced_index(len(qs_interpolated), k=n_interpolations)
+    
+    for idx in idx_list:
+        if end_node_id and idx == idx_list[-1]:
+            g.add_edge(prev_node_id, end_node_id)
+        else:
+            new_node = Node(qs_interpolated[idx][0], qs_interpolated[idx][1])
+            new_node_id = g.add_node(new_node)
+            g.add_edge(prev_node_id, new_node_id)
+            prev_node_id = new_node_id
 
     return prev_node_id 
 
-def create_path(robot, cube, N, q0, c0, qe, ce, n_steps_interpol=20):
+def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20, n_steps_graph_interpolations=10, control=False):
     #setcubeplacement(robot, cube, c0)
     #updatevisuals(viz, robot, cube, q=q0)
     
+    assert n_steps_graph_interpolations <= n_steps_interpol, "The number of interpolations added to the graph must be lower than the number of interpolations computed"
+
     start_node = Node(c0, q0)
     g = Node_Graph(start_node)
     end_node = Node(ce, qe)
@@ -141,31 +165,29 @@ def create_path(robot, cube, N, q0, c0, qe, ce, n_steps_interpol=20):
     prev_q = q0.copy()
     available_path = False
     print("Creating sample path: ")
-    for _ in tqdm(range(N), ascii=True, unit='samples'):
+    for _ in tqdm(range(n_samples), ascii=True, unit='samples'):
         # maybe make a better randomizer how this is done 
         sampled_cube = generate_random_cube()
-        
-        qt, success_grasp = computeqgrasppose(robot, q0, cube, sampled_cube, viz=None)
+        qt, success_grasp = computeqgrasppose(robot, q0, cube, sampled_cube, viz=None, control=control)
+       
         if success_grasp:
             closest_node_id = g.find_closest_neigbour(sampled_cube)
             closest_node = g.nodes[closest_node_id]
-
-            qs_interpolated = compute_interpolation(robot, cube, closest_node.q, closest_node.cube, sampled_cube, n_steps=n_steps_interpol)
-
-            if len(qs_interpolated) > 1:
-                last_node_id = add_interpolations(g, qs_interpolated, closest_node_id, n_interpolations=2)
-
-                qs_interpolated_end = compute_interpolation(robot, cube, qs_interpolated[-1][1], qs_interpolated[-1][0], ce, n_steps=n_steps_interpol)
-                if len(qs_interpolated_end) > 1:
-
-                    g = add_interpolations(g, qs_interpolated_end, last_node_id, n_interpolations=2)
-
-                    if len(qs_interpolated_end) == n_steps_interpol+1:
-                        available_path = True
+            qs_interpolated, success_edge = compute_interpolation(robot, cube, closest_node.q, closest_node.cube, sampled_cube, 
+                                                                  n_steps=n_steps_interpol, control=control)
+        
+            if success_edge:
+                last_node_id = add_interpolations(g, qs_interpolated, closest_node_id, n_steps_graph_interpolations)
+                qs_interpolated_end, success_end = compute_interpolation(robot, cube, qs_interpolated[-1][1], qs_interpolated[-1][0], ce, 
+                                                                         n_steps=n_steps_interpol, control=control)
+                
+                if success_end:
+                    add_interpolations(g, qs_interpolated_end, last_node_id, n_steps_graph_interpolations, end_node_id=end_node_id)
+                    available_path = True
         
     return g, available_path
 
-def shortest_path(g):
+def shortest_path(g: Node_Graph):
     TARGET_NODE_ID = 1
     
     num_nodes = len(g.nodes)
@@ -178,7 +200,6 @@ def shortest_path(g):
 
     while priority_queue:
         current_distance, current_node_id = heapq.heappop(priority_queue)
-        #print(current_node_id, round(current_distance, 2))
 
         if current_node_id == TARGET_NODE_ID:
             
@@ -193,7 +214,6 @@ def shortest_path(g):
             continue
 
         for neighbour_id, neighbour_distance in g.nodes[current_node_id].neighbours.items():
-            #print('\t', neighbour_id, round(neighbour_distance, 2))
             new_distance = current_distance + neighbour_distance
             if new_distance < distances[neighbour_id]:
                 distances[neighbour_id] = new_distance
@@ -204,28 +224,24 @@ def shortest_path(g):
 
 #returns a collision free path from qinit to qgoal under grasping constraints
 #the path is expressed as a list of configurations
-def computepath(robot, cube, qinit,qgoal,cubeplacementq0, cubeplacementqgoal):
+def computepath(robot, cube, qinit,qgoal,cubeplacementq0, cubeplacementqgoal, control=False, **kwargs):
     graph, success = create_path(
         robot,
-        cube, 
-        N=500,
+        cube,
         q0=qinit,
         c0=cubeplacementq0,
         qe=qgoal,
         ce=cubeplacementqgoal,
-        n_steps_interpol=15
+        control=control,
+        **kwargs
     )
 
-    if success:
-        path, length = shortest_path(graph)
-    else:
-        return np.array([])
+    if not success:
+        return np.array([]), 0
     
-    path_qs = []
-    for id in path:
-        path_qs.append(graph.nodes[id].q)
-
-    return path_qs
+    path, length = shortest_path(graph)
+    
+    return [graph.nodes[id].q for id in path], length
 
 def displaypath(robot,path,dt,viz):
     for q in path:
@@ -239,16 +255,16 @@ if __name__ == "__main__":
     from inverse_geometry import computeqgrasppose
     
     robot, cube, viz = setupwithmeshcat()
-    
-    
+
     q = robot.q0.copy()
     q0,successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
     qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
     
     if not(successinit and successend):
         print ("error: invalid initial or end configuration")
-    
-    path = computepath(q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET)
+
+    extra_args = {'n_samples': 300, 'n_steps_graph_interpolations': 5}
+    path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, **extra_args)
     
     displaypath(robot,path,dt=0.5,viz=viz) #you ll probably want to lower dt
     

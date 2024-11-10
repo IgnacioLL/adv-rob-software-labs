@@ -26,6 +26,7 @@ def cost_v1(q, robot, target_left, target_right, lh_frameid, rh_frameid):
     eff_lh = robot.data.oMf[lh_frameid]
     eff_rh = robot.data.oMf[rh_frameid]
     
+    
     cost_lh = norm(eff_lh.np - target_left.np)**2
     cost_rh = norm(eff_rh.np - target_right.np)**2
     
@@ -36,12 +37,13 @@ def callback(q):
     #time.sleep(.5)
     pass
 
-def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001):
+def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001, control=False):
     '''Return a collision free configuration grasping a cube at a specific location and a success flag'''
     setcubeplacement(robot, cube, cubetarget)
 
     target_left = getcubeplacement(cube, LEFT_HOOK)
     target_right = getcubeplacement(cube, RIGHT_HOOK)
+
     lh_frameid = robot.model.getFrameId('LARM_EFF')
     rh_frameid = robot.model.getFrameId('RARM_EFF')
 
@@ -57,6 +59,19 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001):
     tolerable_error = False
     if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]):
         tolerable_error = True
+        if control:
+            grip_adjustment = (target_right.translation - target_left.translation)/3
+            target_right.translation = target_right.translation - grip_adjustment
+            target_left.translation = target_left.translation + grip_adjustment
+
+            qopt_bfgs = fmin_bfgs(
+                cost_v1, 
+                qcurrent, 
+                callback=callback, 
+                args=(robot, target_left, target_right, lh_frameid,rh_frameid),
+                full_output=True,
+                disp=False
+            )
         
     return qopt_bfgs[0], tolerable_error
             
