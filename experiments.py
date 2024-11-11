@@ -72,45 +72,70 @@ def check_path_hyperparameters():
     plt.savefig("experiments/euclidean_distances.png")
 
 
-# Define the objective function for Optuna
+import time
+
 def optimize(trial):
-    robot, sim, cube = setupwithpybullet()
+    retries = 3  
+    attempt = 0
+    success = False
+    total_error = float('inf') 
+
+    while attempt < retries and not success:
+        try:
+            robot, sim, cube = setupwithpybullet()
+
+            q0, successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
+            qe, successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET, None)
+
+            if not successinit or not successend:
+                raise ValueError("Failed to compute grasps")
+
+            sim.setqsim(q0)
+
+            extra_args = {'n_samples': 250, 'n_steps_graph_interpolations': 5}
+            length = 0
+            while length < 3:
+                path, _ = computepath(robot, cube, q0, qe, CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
+                length = len(path)
+
+            # Suggest values for the hyperparameters we want to tune
+            bezier_redundancy = trial.suggest_int('BEZIER_REDUNDANCY', 1, 5) 
+            kp = trial.suggest_float('KP', 10, 10_000, log=True)  
+            kv = trial.suggest_float('KV', 1, 1_000, log=True)  
+
+            # Recreate the path with redundancy
+            new_path = [p for p in path for _ in range(bezier_redundancy)]
+            total_time = 4
+            trajs = maketraj(new_path, total_time)
+
+            # Initialize variables for simulation
+            tcur = 0.0
+            q_errors, v_errors = None, None
+            total_error = 0.0
+
+            # Run the simulation loop
+            while tcur < total_time:
+                q_errors, v_errors = rununtil(controllaw, DT, sim, robot, trajs, tcur, cube, kp, kv, q_errors, v_errors)
+                # Calculate error metric (adjust based on the desired outcome)
+                total_error += sum(abs(err) for err in q_errors)  # Example: sum of absolute errors
+                tcur += DT
+
+            success = True  
+        except Exception as e:
+            attempt += 1
+            print(f"Attempt {attempt} failed: {e}")
+            time.sleep(1) 
+
+    if not success:
+        print("Optimization failed after several attempts.")
+        return float('inf')  
     
-    q0,successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
-    qe,successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET,  None)
-
-    sim.setqsim(q0)
-
-    extra_args = {'n_samples': 250, 'n_steps_graph_interpolations':5}
-    path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
-
-    # Suggest values for the hyperparameters we want to tune
-    bezier_redundancy = trial.suggest_int('BEZIER_REDUNDANCY', 1, 5)  # Adjust range as needed
-    kp = trial.suggest_float('KP', 10, 10_000, log=True)  # Adjust range as needed
-    kv = trial.suggest_float('KV', 1, 1_000, log=True)  # Adjust range as needed
-
-    # Recreate the path with redundancy
-    new_path = [p for p in path for _ in range(bezier_redundancy)]
-    total_time = 4
-    trajs = maketraj(new_path, total_time)
-
-    # Initialize variables for simulation
-    tcur = 0.0
-    q_errors, v_errors = None, None
-    total_error = 0.0
-
-    # Run the simulation loop
-    while tcur < total_time:
-        q_errors, v_errors = rununtil(controllaw, DT, sim, robot, trajs, tcur, cube, kp, kv, q_errors, v_errors)
-        # Calculate error metric (adjust based on the desired outcome)
-        total_error += sum(abs(err) for err in q_errors)  # Example: sum of absolute errors
-        tcur += DT
-
-    # Objective value to minimize (use total_error or a similar metric)
+    # Return the total error if successful
     return total_error
 
+
 def check_control_hyperparameters():
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="minimize", storage="sqlite:///my_study.db", load_if_exists=True)
     study.optimize(optimize, n_trials=100)  # Adjust n_trials as needed
     study_results = study.trials_dataframe()
     study_results.to_excel("experiments/control_experiment.xlsx", index=False)

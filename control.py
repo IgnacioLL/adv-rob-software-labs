@@ -24,6 +24,7 @@ def controllaw(sim, robot, trajs, tcurrent, cube, Kp=15_000, Kv=1000, q_previous
     q_target = trajs[0](tcurrent)
     v_target = trajs[1](tcurrent)
     
+    
     # Initialize previous errors to 0.
     if q_previous_error is None and v_previous_error is None:
         q_previous_error = np.zeros(q_target.shape)

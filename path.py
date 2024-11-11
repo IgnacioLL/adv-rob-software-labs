@@ -23,15 +23,15 @@ import math
 
 def generate_random_cube():
     
-    random_Cube = pin.SE3(pin.utils.rotate('z', 0.),np.array([0.33, 0.0, 0.93]))
+    random_Cube = pin.SE3(pin.utils.rotate('z', 0.),np.array([0.0, 0.0, 0.0]))
     # For Random Rotation
     #random_Cube = random_Cube.Random()
     #random_Cube.translation = np.array([0.33, 0.0, 0.93])
     
     rd_delta_translations = np.random.random(3)
-    rd_delta_translations[0] = (rd_delta_translations[0] - 0.5)
+    rd_delta_translations[0] = (rd_delta_translations[0] * 0.6) + 0.15
     rd_delta_translations[1] = (rd_delta_translations[1] - 0.5)
-    rd_delta_translations[2] = (rd_delta_translations[2])
+    rd_delta_translations[2] = (rd_delta_translations[2]*0.6) + 0.93
 
     random_Cube.translation = random_Cube.translation + rd_delta_translations
     
@@ -45,7 +45,7 @@ class Node:
     def __init__(self, cube_coordinates, q):
         self.cube = cube_coordinates
         self.q = q
-        self.neighbours = {}
+        self.children = {}
         
 class Node_Graph:
     
@@ -67,7 +67,7 @@ class Node_Graph:
         end_node = self.nodes[node2_id]
                 
         dist = euclid_dist(start_node.cube, end_node.cube) 
-        self.nodes[node1_id].neighbours[node2_id] = dist
+        self.nodes[node1_id].children[node2_id] = dist
         
         return True
         
@@ -152,8 +152,6 @@ def add_interpolations(g, qs_interpolated, closest_node_id, n_interpolations=1, 
     return prev_node_id 
 
 def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20, n_steps_graph_interpolations=10, control=False):
-    #setcubeplacement(robot, cube, c0)
-    #updatevisuals(viz, robot, cube, q=q0)
     
     assert n_steps_graph_interpolations <= n_steps_interpol, "The number of interpolations added to the graph must be lower than the number of interpolations computed"
 
@@ -162,7 +160,6 @@ def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20,
     end_node = Node(ce, qe)
     end_node_id = g.add_node(end_node)
 
-    prev_q = q0.copy()
     available_path = False
     print("Creating sample path: ")
     for _ in tqdm(range(n_samples), ascii=True, unit='samples'):
@@ -213,12 +210,12 @@ def shortest_path(g: Node_Graph):
         if current_distance > distances[current_node_id]:
             continue
 
-        for neighbour_id, neighbour_distance in g.nodes[current_node_id].neighbours.items():
-            new_distance = current_distance + neighbour_distance
-            if new_distance < distances[neighbour_id]:
-                distances[neighbour_id] = new_distance
-                previous_nodes[neighbour_id] = current_node_id
-                heapq.heappush(priority_queue, (new_distance, neighbour_id))
+        for children_id, children_distance in g.nodes[current_node_id].children.items():
+            new_distance = current_distance + children_distance
+            if new_distance < distances[children_id]:
+                distances[children_id] = new_distance
+                previous_nodes[children_id] = current_node_id
+                heapq.heappush(priority_queue, (new_distance, children_id))
 
     return None, np.inf
 

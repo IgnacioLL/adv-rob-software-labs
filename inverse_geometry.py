@@ -9,7 +9,7 @@ Created on Wed Sep  6 15:32:51 2023
 import pinocchio as pin 
 import numpy as np
 from numpy.linalg import pinv,inv,norm,svd,eig
-from tools import collision, getcubeplacement, setcubeplacement, projecttojointlimits
+from tools import collision, getcubeplacement, setcubeplacement, projecttojointlimits, jointlimitsviolated
 from config import LEFT_HOOK, RIGHT_HOOK, LEFT_HAND, RIGHT_HAND, EPSILON
 from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 
@@ -26,11 +26,15 @@ def cost_v1(q, robot, target_left, target_right, lh_frameid, rh_frameid):
     eff_lh = robot.data.oMf[lh_frameid]
     eff_rh = robot.data.oMf[rh_frameid]
     
-    
     cost_lh = norm(eff_lh.np - target_left.np)**2
     cost_rh = norm(eff_rh.np - target_right.np)**2
+
+    cost_d = cost_lh + cost_rh
+
+    q_epsilon = (robot.model.upperPositionLimit - robot.model.lowerPositionLimit) / 100
+    cost_joint_limits = jointlimitscost(robot, q - q_epsilon) + jointlimitscost(robot, q + q_epsilon)
     
-    return cost_lh + cost_rh + jointlimitscost(robot, q)
+    return cost_d + cost_joint_limits
 
 def callback(q):
     #updatevisuals(viz, robot, cube, q)
@@ -57,7 +61,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001, c
     )
 
     tolerable_error = False
-    if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]):
+    if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]) and not jointlimitsviolated(robot, qopt_bfgs[0]):
         tolerable_error = True
         if control:
             grip_adjustment = (target_right.translation - target_left.translation)/4
@@ -79,13 +83,13 @@ if __name__ == "__main__":
     from tools import setupwithmeshcat
     from setup_meshcat import updatevisuals
     robot, cube, viz = setupwithmeshcat()
-    
+
     q = robot.q0.copy()
-    
+
     q0,successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
     qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
-    
+
     updatevisuals(viz, robot, cube, q0)
-    
-    
-    
+
+
+        
