@@ -5,7 +5,7 @@ import seaborn as sns
 import optuna
 
 
-from tools import setupwithmeshcat, setupwithpybullet, rununtil
+from tools import setupwithmeshcat, setupwithpybullet, rununtil, getcubeplacement
 from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, DT
 from inverse_geometry import computeqgrasppose
 from path import computepath
@@ -92,11 +92,19 @@ def optimize(trial):
 
             sim.setqsim(q0)
 
-            extra_args = {'n_samples': 250, 'n_steps_graph_interpolations': 5}
-            length = 0
-            while length < 3:
-                path, _ = computepath(robot, cube, q0, qe, CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
-                length = len(path)
+            # extra_args = {'n_samples': 250, 'n_steps_graph_interpolations': 5}
+            # length = 0
+            # while length < 3:
+            #     path, _ = computepath(robot, cube, q0, qe, CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
+            #     length = len(path)
+
+            import os
+            import random
+            import pickle as pkl
+
+            paths = os.listdir("path/")
+            rand = random.randint(0, len(paths)-1)
+            path = pkl.load(open(f"path/{paths[rand]}", "rb"))
 
             # Suggest values for the hyperparameters we want to tune
             bezier_redundancy = trial.suggest_int('BEZIER_REDUNDANCY', 1, 3) 
