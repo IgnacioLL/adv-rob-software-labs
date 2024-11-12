@@ -99,9 +99,9 @@ def optimize(trial):
                 length = len(path)
 
             # Suggest values for the hyperparameters we want to tune
-            bezier_redundancy = trial.suggest_int('BEZIER_REDUNDANCY', 1, 5) 
-            kp = trial.suggest_float('KP', 10, 10_000, log=True)  
-            kv = trial.suggest_float('KV', 1, 1_000, log=True)  
+            bezier_redundancy = trial.suggest_int('BEZIER_REDUNDANCY', 1, 3) 
+            kp = trial.suggest_float('KP', 100, 10_000, log=True)  
+            kv = trial.suggest_float('KV', 20, 1_000, log=True)  
 
             # Recreate the path with redundancy
             new_path = [p for p in path for _ in range(bezier_redundancy)]
@@ -135,10 +135,10 @@ def optimize(trial):
 
 
 def check_control_hyperparameters():
-    study = optuna.create_study(direction="minimize", storage="sqlite:///my_study.db", load_if_exists=True)
-    study.optimize(optimize, n_trials=100)  # Adjust n_trials as needed
+    study = optuna.create_study(direction="minimize")
+    study.optimize(optimize, n_trials=20)  # Adjust n_trials as needed
     study_results = study.trials_dataframe()
-    study_results.to_excel("experiments/control_experiment.xlsx", index=False)
+    study_results.to_csv("experiments/control_experiment.csv", index=False)
 
 
 
