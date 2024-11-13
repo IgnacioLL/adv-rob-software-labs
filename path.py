@@ -22,15 +22,16 @@ import math
 
 from tools import getcubeplacement, setcubeplacement
 from setup_meshcat import updatevisuals
+import solution
 
 
-
-def generate_random_cube():
+def generate_random_cube(random_rotation=False):
     
     random_Cube = pin.SE3(pin.utils.rotate('z', 0.),np.array([0.0, 0.0, 0.0]))
-    # For Random Rotation
-    #random_Cube = random_Cube.Random()
-    #random_Cube.translation = np.array([0.33, 0.0, 0.93])
+
+    if random_rotation:
+        random_Cube = random_Cube.Random()
+        random_Cube.translation =np.array([0.0, 0.0, 0.0])
     
     rd_delta_translations = np.random.random(3)
     rd_delta_translations[0] = (rd_delta_translations[0] * 0.6) + 0.15
@@ -44,6 +45,10 @@ def generate_random_cube():
 def euclid_dist(cube_1, cube_2) -> float:
     return np.sqrt(np.sum((cube_2.translation - cube_1.translation)**2))
 
+def get_n_nodes_to_add(max_points, cube_pose_1, cube_pose_2):
+    n_nodes_to_add = min(max_points, max(int(euclid_dist(cube_pose_1, cube_pose_2) * 15), 1))
+
+    return n_nodes_to_add
 
 class Node:
     def __init__(self, cube_coordinates, q):
@@ -138,7 +143,6 @@ def compute_interpolation(robot, cube, q_start, cube_start_pose, cube_end_pose, 
     return q_cube_interpolated, successful_interpolation
 
 def add_interpolations(g, q_cube_interpolated, start_node_id, success_interpolation, n_nodes_to_add=3, end_node_id=None):
-    
     if not n_nodes_to_add <= len(q_cube_interpolated) - 1:
         n_nodes_to_add = len(q_cube_interpolated) - 1
     
@@ -148,8 +152,7 @@ def add_interpolations(g, q_cube_interpolated, start_node_id, success_interpolat
     else:
         # If interpolation wasn't successful, only add the middle successful interpolated point
         idx_list = [len(q_cube_interpolated) // 2]
-        print(idx_list)
-    
+
     prev_node_id = start_node_id
     for idx in idx_list:
         cube_pose_new_node, q_new_node = q_cube_interpolated[idx]
@@ -166,15 +169,14 @@ def add_interpolations(g, q_cube_interpolated, start_node_id, success_interpolat
 
     return prev_node_id 
 
-def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20, n_nodes_to_add=5, control=False):
+def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20, control=False):
     
-    assert n_nodes_to_add <= n_steps_interpol, "The number of interpolations added to the graph must be lower than the number of interpolations computed"
-
     # Instantiate Graph
     start_node = Node(c0, q0)
     g = Node_Graph(start_node)
     end_node = Node(ce, qe)
     end_node_id = g.add_node(end_node)
+
 
     available_path = False
     for i in tqdm(range(n_samples), ascii=True, unit='samples'):
@@ -199,21 +201,12 @@ def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20,
                 q_start=closest_node.q,
                 cube_start_pose=closest_node.cube_pose, 
                 cube_end_pose=sampled_cube_pose, 
-                n_steps=n_steps_interpol, 
+                n_steps=n_steps_interpol,
                 control=control
             )
         
             if len(q_cube_interpolated) > 2:
-                #print(q_cube_interpolated[-1][0].translation)
-                #print(q_cube_interpolated[-1][1])
-
-                # Visualize New Nodes to add
-                #the cube position is updated using the following function:
-                #setcubeplacement(robot, cube, q_cube_interpolated[-1][0])
-                #to update the frames for both the robot and the cube you can call
-                #updatevisuals(viz, robot, cube, q_cube_interpolated[-1][1])
-                #time.sleep(2)
-
+                n_nodes_to_add = get_n_nodes_to_add(len(q_cube_interpolated)-1, closest_node.cube_pose, sampled_cube_pose)
                 last_node_id = add_interpolations(
                     g, 
                     q_cube_interpolated, 
@@ -234,6 +227,7 @@ def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20,
                 )
                     
                 if success_end:
+                    n_nodes_to_add = get_n_nodes_to_add(len(qs_interpolated_end)-1, sampled_cube_pose, ce)
                     add_interpolations(
                         g, 
                         qs_interpolated_end, 
@@ -242,8 +236,9 @@ def create_path(robot, cube, q0, c0, qe, ce, n_samples=500, n_steps_interpol=20,
                         n_nodes_to_add, 
                         end_node_id=end_node_id
                     )
+                    #solution.plot_2d_points(graph=g)
                     available_path = True
-        
+
     return g, available_path
 
 def shortest_path(g: Node_Graph):
@@ -323,7 +318,15 @@ if __name__ == "__main__":
         print ("error: invalid initial or end configuration")
 
     extra_args = {'n_samples': 300, 'n_nodes_to_add': 5}
-    path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, **extra_args)
+    # path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, **extra_args)
+
+    import os
+    import random
+    import pickle as pkl
+
+    paths = os.listdir("path/")
+    rand = random.randint(0, len(paths)-1)
+    path = pkl.load(open(f"path/{paths[rand]}", "rb"))
 
 
     displaypath(robot,path,dt=0.5,viz=viz) #you ll probably want to lower dt

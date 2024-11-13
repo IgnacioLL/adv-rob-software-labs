@@ -10,8 +10,7 @@ import pinocchio as pin
 import numpy as np
 from numpy.linalg import pinv,inv,norm,svd,eig
 from tools import collision, getcubeplacement, setcubeplacement, projecttojointlimits, jointlimitsviolated
-from config import LEFT_HOOK, RIGHT_HOOK, LEFT_HAND, RIGHT_HAND, EPSILON
-from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
+from config import LEFT_HOOK, RIGHT_HOOK, LEFT_HAND, RIGHT_HAND, EPSILON,  CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, PULL_CUBE
 
 from tools import setcubeplacement, jointlimitscost, distanceToObstacle
 
@@ -51,6 +50,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001, c
     lh_frameid = robot.model.getFrameId('LARM_EFF')
     rh_frameid = robot.model.getFrameId('RARM_EFF')
 
+    
     qopt_bfgs = fmin_bfgs(
         cost_v1, 
         qcurrent, 
@@ -64,7 +64,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001, c
     if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]) and not jointlimitsviolated(robot, qopt_bfgs[0]):
         tolerable_error = True
         if control:
-            grip_adjustment = (target_right.translation - target_left.translation)/4
+            grip_adjustment = (target_right.translation - target_left.translation)/PULL_CUBE
             target_right.translation = target_right.translation - grip_adjustment
             target_left.translation = target_left.translation + grip_adjustment
 
@@ -87,9 +87,10 @@ if __name__ == "__main__":
     q = robot.q0.copy()
 
     q0,successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
-    qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
-
     updatevisuals(viz, robot, cube, q0)
 
+    # time.sleep(2)
+    # qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
+    # updatevisuals(viz, robot, cube, qe)
 
         

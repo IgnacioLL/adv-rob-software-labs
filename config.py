@@ -20,6 +20,7 @@ USE_PYBULLET_REALTIME = USE_PYBULLET and False
 
 DT = 1e-3 #simulation tick time (s)
 EPSILON = 1e-3 #almost 0
+PULL_CUBE = 4
 
 #the remaining variables should not be edited in theory
 LEFT_HAND  = 'LARM_EFF'

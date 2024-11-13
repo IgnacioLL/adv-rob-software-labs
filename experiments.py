@@ -17,8 +17,6 @@ import time
 import argparse
 
 
-
-
 def check_path_hyperparameters():
     ## Check path.py and how hyperparameters vary
     robot, cube, viz = setupwithmeshcat()
@@ -60,7 +58,7 @@ def check_path_hyperparameters():
     columns_names = ['n_samples', 'graph_interpolations', 'execution_times', 'path_length', 'euclidean_distances']
     data = pd.DataFrame([n_samples, graph_interpolations, execution_times, path_length, euclidean_distances], index=columns_names).T
 
-    data.to_excel("experiments/experiments.xlsx", index=False)
+    data.to_csv("experiments/experiments.csv", index=False)
 
     sns.lineplot(data=data, y='execution_times', x='n_samples', hue='graph_interpolations')
     plt.savefig("experiments/execution_times.png")
@@ -126,6 +124,7 @@ def optimize(trial):
                 q_errors, v_errors = rununtil(controllaw, DT, sim, robot, trajs, tcur, cube, kp, kv, q_errors, v_errors)
                 # Calculate error metric (adjust based on the desired outcome)
                 total_error += sum(abs(err) for err in q_errors)  # Example: sum of absolute errors
+                print(q_errors)
                 tcur += DT
 
             success = True  

@@ -13,8 +13,8 @@ from tools import setcubeplacement, getcubeplacement
 from config import CUBE_PLACEMENT_TARGET
     
 # in my solution these gains were good enough for all joints but you might want to tune this.
-KP = 8_000 # proportional gain (P of PD)
-KV = 0   # derivative gain (D of PD)
+KP = 8000 # proportional gain (P of PD)
+KV = 10   # derivative gain (D of PD)
 
 BEZIER_REDUNDANCY = 2
 
@@ -59,41 +59,43 @@ if __name__ == "__main__":
     from config import DT, CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
     from inverse_geometry import computeqgrasppose
     from path import computepath
+    import pickle as pkl
+    import uuid
+    import os
+    import random
 
     robot, sim, cube = setupwithpybullet()
     
     q0,successinit = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT, None)
     qe,successend = computeqgrasppose(robot, robot.q0, cube, CUBE_PLACEMENT_TARGET,  None)
 
-    sim.setqsim(q0)
+    if successinit and successend:
+        sim.setqsim(q0)
 
-    extra_args = {'n_samples': 250, 'n_nodes_to_add':5}
-    length = 0
-    while length < 3:
-        path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
-        length = len(path)
+        extra_args = {'n_samples': 250, 'n_nodes_to_add':5}
 
-    
-    import pickle as pkl
-    import uuid
-    pkl.dump(path, open(f"path/path_{str(uuid.uuid4())}.pkl", "wb"))
-    
-    # Create redundancy in BEZIER
-    if length < 10:
+        length = 0
+        tries = 0
+        while length < 3 and tries < 3:
+            path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, control=True, **extra_args)
+            length = len(path)
+            tries +=1
+
+        # Create redundancy in BEZIER
         new_path = [p for p in path for _ in range(BEZIER_REDUNDANCY)]
+
+        total_time=4
+        trajs = maketraj(new_path, total_time)  
+
+        tcur = 0.
+        q_errors, v_errors = None, None
+        while tcur < total_time:
+            q_errors, v_errors = rununtil(controllaw, DT, sim, robot, trajs, tcur, cube, KP, KV, q_errors, v_errors)
+            tcur += DT
     else:
-        new_path = path.copy()
-    
-    total_time=4
-    trajs = maketraj(new_path, total_time)  
+        print("Without successfull grasp in start or end cube position")
+                
 
-    tcur = 0.
-    q_errors, v_errors = None, None
-    while tcur < total_time:
-        q_errors, v_errors = rununtil(controllaw, DT, sim, robot, trajs, tcur, cube, KP, KV, q_errors, v_errors)
-        tcur += DT
-            
-
-    
+        
     
     
