@@ -317,17 +317,10 @@ if __name__ == "__main__":
     if not(successinit and successend):
         print ("error: invalid initial or end configuration")
 
-    extra_args = {'n_samples': 300, 'n_nodes_to_add': 5}
-    # path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, **extra_args)
+    extra_args = {'n_samples': 300}
+    path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, **extra_args)
 
-    import os
-    import random
-    import pickle as pkl
-
-    paths = os.listdir("path/")
-    rand = random.randint(0, len(paths)-1)
-    path = pkl.load(open(f"path/{paths[rand]}", "rb"))
-
+    setcubeplacement(robot, cube, CUBE_PLACEMENT_TARGET)
 
     displaypath(robot,path,dt=0.5,viz=viz) #you ll probably want to lower dt
     
