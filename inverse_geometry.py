@@ -64,7 +64,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None, tol=0.0001, c
     if qopt_bfgs[1] < tol and not collision(robot, qopt_bfgs[0]) and not jointlimitsviolated(robot, qopt_bfgs[0]):
         tolerable_error = True
         if control:
-            grip_adjustment = (target_right.translation - target_left.translation)/PULL_CUBE
+            grip_adjustment = (target_right.translation - target_left.translation)*PULL_CUBE
             target_right.translation = target_right.translation - grip_adjustment
             target_left.translation = target_left.translation + grip_adjustment
 
@@ -89,8 +89,7 @@ if __name__ == "__main__":
     q0,successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
     updatevisuals(viz, robot, cube, q0)
 
-    # time.sleep(2)
-    # qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
-    # updatevisuals(viz, robot, cube, qe)
+    qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
+    updatevisuals(viz, robot, cube, qe)
 
         

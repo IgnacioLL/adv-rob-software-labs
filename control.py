@@ -72,7 +72,7 @@ if __name__ == "__main__":
     if successinit and successend:
         sim.setqsim(q0)
 
-        extra_args = {'n_samples': 250, 'n_nodes_to_add':5}
+        extra_args = {'n_samples': 100}
 
         length = 0
         tries = 0

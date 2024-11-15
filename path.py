@@ -317,7 +317,7 @@ if __name__ == "__main__":
     if not(successinit and successend):
         print ("error: invalid initial or end configuration")
 
-    extra_args = {'n_samples': 300}
+    extra_args = {'n_samples': 250}
     path, _ = computepath(robot, cube, q0,qe,CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET, **extra_args)
 
     setcubeplacement(robot, cube, CUBE_PLACEMENT_TARGET)
